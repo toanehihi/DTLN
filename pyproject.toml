@@ -1,0 +1,36 @@
+[project]
+name = "dtln"
+version = "0.1.0"
+requires-python = ">=3.9,<3.11"
+
+dependencies = [
+    # Core TensorFlow - Latest stable compatible with Python 3.9
+    "tensorflow>=2.13.0,<2.16.0",
+    "tensorflow-estimator>=2.13.0,<2.16.0",
+    "tensorboard>=2.13.0,<2.16.0",
+    
+    # Audio processing - Updated versions
+    "librosa>=0.10.0,<0.11.0",
+    "soundfile>=0.12.0,<0.13.0",
+    "audioread>=3.0.0,<4.0.0",
+    "resampy>=0.4.0,<0.5.0",
+    "wavinfo>=3.0.0,<4.0.0",
+    
+    # Scientific computing - Compatible with Python 3.9
+    "numpy>=1.24.0,<2.0.0",
+    "scipy>=1.11.0,<2.0.0",
+    "scikit-learn>=1.3.0,<2.0.0",
+    "numba>=0.58.0,<0.59.0",
+    
+    # Visualization
+    "matplotlib>=3.7.0,<4.0.0",
+    
+    # Data processing
+    "h5py>=3.9.0,<4.0.0",
+    "pandas>=2.0.0,<3.0.0",
+    
+    # Utilities
+    "click>=8.1.0,<9.0.0",
+    "tqdm>=4.65.0,<5.0.0",
+    "pyyaml>=6.0.0,<7.0.0",
+]

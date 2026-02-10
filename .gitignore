@@ -1,0 +1,6 @@
+datasets_fullband/
+.venv/
+datasets/
+vivos_datasets/
+.vscode/
+__pycache__/
