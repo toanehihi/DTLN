@@ -246,7 +246,7 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
     # Paths relative to script location
-    weights_path = os.path.join(script_dir, "model/DTLN_vivos_best.weights.h5")
+    weights_path = os.path.join(script_dir, "model/DTLN_vivos_best.h5")
     input_audio = os.path.join(script_dir, "test_audio/noisy_sample.wav")
     output_audio = os.path.join(script_dir, "test_audio/denoised_output.wav")
     
