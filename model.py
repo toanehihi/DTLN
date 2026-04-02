@@ -31,7 +31,6 @@ class audio_generator():
             train_flag          flag for activate shuffling of files
             file_mapping_csv    optional CSV file mapping noisy to clean filenames
         '''
-        # set inputs to properties
         self.path_to_input = path_to_input
         self.path_to_s1 = path_to_s1
         self.len_of_samples = len_of_samples
@@ -66,7 +65,6 @@ class audio_generator():
         '''
         Method to list the data of the dataset and count the number of samples. 
         '''
-
         # list .wav files in directory
         self.file_names = fnmatch.filter(os.listdir(self.path_to_input), '*.wav')
         # count the number of samples contained in the dataset
@@ -81,7 +79,6 @@ class audio_generator():
         '''
         Method to create the iterator. 
         '''
-
         # check if training or validation
         if self.train_flag:
             shuffle(self.file_names)
@@ -122,7 +119,6 @@ class audio_generator():
         '''
         Method to to create the tf.data.Dataset. 
         '''
-
         # creating the tf.data.Dataset from the iterator
         self.tf_data_set = tf.data.Dataset.from_generator(
                         self.create_generator,
@@ -130,9 +126,6 @@ class audio_generator():
                         output_shapes=(tf.TensorShape([self.len_of_samples]), \
                                        tf.TensorShape([self.len_of_samples])),
                         args=None)
-
-        
-                
 
 
 class DTLN_model():
@@ -144,7 +137,6 @@ class DTLN_model():
         '''
         Constructor
         '''
-
         # defining default cost function
         self.cost_function = self.snr_cost
         # empty property for the model
@@ -182,7 +174,6 @@ class DTLN_model():
         The negative signal to noise ratio is calculated here. The loss is 
         always calculated over the last dimension. 
         '''
-
         # calculating the SNR
         snr = tf.reduce_mean(tf.math.square(s_true), axis=-1, keepdims=True) / \
             (tf.reduce_mean(tf.math.square(s_true-s_estimate), axis=-1, keepdims=True)+1e-7)
@@ -190,7 +181,6 @@ class DTLN_model():
         num = tf.math.log(snr) 
         denom = tf.math.log(tf.constant(10, dtype=num.dtype))
         loss = -10*(num / (denom))
-        # returning the loss
         return loss
         
 
@@ -204,16 +194,10 @@ class DTLN_model():
             loss = tf.squeeze(self.cost_function(y_pred,y_true))
             # calculate mean over batches
             loss = tf.reduce_mean(loss)
-            # return the loss
             return loss
         # returning the loss function as handle
         return lossFunction
     
-    
-
-    '''
-    In the following some helper layers are defined.
-    '''  
     
     def stftLayer(self, x):
         '''
@@ -221,7 +205,6 @@ class DTLN_model():
         calculates the STFT on the last dimension and returns the magnitude and
         phase of the STFT.
         '''
-        
         # creating frames from the continuous waveform
         frames = tf.signal.frame(x, self.blockLen, self.block_shift)
         # calculating the fft over the time frames. rfft returns NFFT/2+1 bins.
@@ -229,7 +212,6 @@ class DTLN_model():
         # calculating magnitude and phase from the complex signal
         mag = tf.abs(stft_dat)
         phase = tf.math.angle(stft_dat)
-        # returning magnitude and phase as list
         return [mag, phase]
     
     def fftLayer(self, x):
@@ -238,7 +220,6 @@ class DTLN_model():
         calculates the rFFT on the last dimension and returns the magnitude and
         phase of the STFT.
         '''
-        
         # expanding dimensions
         frame = tf.expand_dims(x, axis=1)
         # calculating the fft over the time frames. rfft returns NFFT/2+1 bins.
@@ -246,18 +227,14 @@ class DTLN_model():
         # calculating magnitude and phase from the complex signal
         mag = tf.abs(stft_dat)
         phase = tf.math.angle(stft_dat)
-        # returning magnitude and phase as list
         return [mag, phase]
 
- 
-        
     def ifftLayer(self, x):
         '''
         Method for an inverse FFT layer used with an Lambda layer. This layer
         calculates time domain frames from magnitude and phase information. 
         As input x a list with [mag,phase] is required.
         '''
-        
         # calculating the complex representation
         s1_stft = (tf.cast(x[0], tf.complex64) * 
                     tf.exp( (1j * tf.cast(x[1], tf.complex64))))
@@ -270,11 +247,9 @@ class DTLN_model():
         Method for an overlap and add helper layer used with a Lambda layer.
         This layer reconstructs the waveform from a framed signal.
         '''
-
         # calculating and returning the reconstructed waveform
         return tf.signal.overlap_and_add(x, self.block_shift)
     
-        
 
     def seperation_kernel(self, num_layer, mask_size, x, stateful=False):
         '''
@@ -286,7 +261,6 @@ class DTLN_model():
             num_layer       Number of LSTM layers
             mask_size       Output size of the mask and size of the Dense layer
         '''
-
         # creating num_layer number of LSTM layers
         for idx in range(num_layer):
             x = LSTM(self.numUnits, return_sequences=True, stateful=stateful)(x)
@@ -296,9 +270,8 @@ class DTLN_model():
         # creating the mask with a Dense and an Activation layer
         mask = Dense(mask_size)(x)
         mask = Activation(self.activation)(mask)
-        # returning the mask
         return mask
-    0
+
     def seperation_kernel_with_states(self, num_layer, mask_size, x, 
                                       in_states):
         '''
@@ -331,7 +304,6 @@ class DTLN_model():
         out_states_c = tf.reshape(tf.stack(states_c, axis=0), 
                                   [1,num_layer,self.numUnits])
         out_states = tf.stack([out_states_h, out_states_c], axis=-1)
-        # returning the mask and states
         return mask, out_states
 
     def build_DTLN_model(self, norm_stft=False):
@@ -344,7 +316,6 @@ class DTLN_model():
         transformation and the second a learned transformation based on 1D-Conv 
         layer. 
         '''
-        
         # input layer for time signal
         time_dat = Input(batch_shape=(None, None))
         # calculate STFT
@@ -374,10 +345,7 @@ class DTLN_model():
         # create waveform with overlap and add procedure
         estimated_sig = Lambda(self.overlapAddLayer)(decoded_frames)
 
-        
-        # create the model
         self.model = Model(inputs=time_dat, outputs=estimated_sig)
-        # show the model summary
         print(self.model.summary())
         
     def build_DTLN_model_stateful(self, norm_stft=False):
@@ -386,7 +354,6 @@ class DTLN_model():
         takes one time domain frame of size (1, blockLen) and one enhanced frame. 
          
         '''
-        
         # input layer for time signal
         time_dat = Input(batch_shape=(1, self.blockLen))
         # calculate STFT
@@ -413,17 +380,13 @@ class DTLN_model():
         estimated = Multiply()([encoded_frames, mask_2]) 
         # decode the frames back to time domain
         decoded_frame = Conv1D(self.blockLen, 1, padding='causal',use_bias=False)(estimated)
-        # create the model
         self.model = Model(inputs=time_dat, outputs=decoded_frame)
-        # show the model summary
         print(self.model.summary())
         
     def compile_model(self):
         '''
         Method to compile the model for training
-
         '''
-        
         # use the Adam optimizer with a clipnorm of 3
         optimizerAdam = keras.optimizers.Adam(learning_rate=self.lr, clipnorm=3.0)
         # compile model with loss function
@@ -432,7 +395,6 @@ class DTLN_model():
     def create_saved_model(self, weights_file, target_name):
         '''
         Method to create a saved model folder from a weights file
-
         '''
         # check for type
         if weights_file.find('_norm_') != -1:
@@ -456,7 +418,6 @@ class DTLN_model():
         implemented see "real_time_processing_tf_lite.py".
         
         The conversion only works with TF 2.3.
-
         '''
         # check for type
         if weights_file.find('_norm_') != -1:
@@ -470,7 +431,6 @@ class DTLN_model():
         # load weights
         self.model.load_weights(weights_file)
         
-        #### Model 1 ##########################
         mag = Input(batch_shape=(1, 1, (self.blockLen//2+1)))
         states_in_1 = Input(batch_shape=(1, self.numLayer, self.numUnits, 2))
         # normalizing log magnitude stfts to get more robust against level variations
@@ -485,8 +445,6 @@ class DTLN_model():
                                                     mag_norm, states_in_1)
         
         model_1 = Model(inputs=[mag, states_in_1], outputs=[mask_1, states_out_1])
-        
-        #### Model 2 ###########################
         
         estimated_frame_1 = Input(batch_shape=(1, 1, (self.blockLen)))
         states_in_2 = Input(batch_shape=(1, self.numLayer, self.numUnits, 2))
@@ -546,7 +504,6 @@ class DTLN_model():
             train_file_mapping: optional CSV file mapping training noisy to clean files
             val_file_mapping: optional CSV file mapping validation noisy to clean files
         '''
-        
         # create save path if not existent
         savePath = './models_'+ runName+'/' 
         if not os.path.exists(savePath):
@@ -646,7 +603,6 @@ class InstantLayerNormalization(Layer):
         '''
         Method to call the Layer. All processing is done here.
         '''
-
         # calculate mean of each frame
         mean = tf.math.reduce_mean(inputs, axis=[-1], keepdims=True)
         # calculate variance of each frame
@@ -660,5 +616,4 @@ class InstantLayerNormalization(Layer):
         outputs = outputs * self.gamma
         # add the bias beta
         outputs = outputs + self.beta
-        # return output
         return outputs

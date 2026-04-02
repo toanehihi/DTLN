@@ -22,15 +22,15 @@ def analyze_durations(dataset_path):
     print(f"{'='*70}\n")
     
     if not os.path.exists(dataset_path):
-        print(f"❌ Path not found: {dataset_path}")
+        print(f"Path not found: {dataset_path}")
         return
     
     # Find all wav files
     wav_files = fnmatch.filter(os.listdir(dataset_path), '*.wav')
     num_files = len(wav_files)
     
-    print(f"📊 Found {num_files:,} WAV files")
-    print(f"🔍 Analyzing durations...\n")
+    print(f"Found {num_files:,} WAV files")
+    print(f"Analyzing durations...\n")
     
     durations = []
     
@@ -47,19 +47,19 @@ def analyze_durations(dataset_path):
                 print(f"   Progress: {i+1:,}/{num_files:,} files analyzed", end='\r')
         
         except Exception as e:
-            print(f"\n⚠️  Error reading {wav_file}: {e}")
+            print(f"\nError reading {wav_file}: {e}")
     
     print()  # New line after progress
     
     if not durations:
-        print("❌ No valid audio files found!")
+        print("No valid audio files found!")
         return
     
     # Convert to numpy array
     durations = np.array(durations)
     
     # Statistics
-    print(f"\n📊 DURATION STATISTICS:")
+    print(f"\nDURATION STATISTICS:")
     print(f"   Total files:     {len(durations):,}")
     print(f"   Total duration:  {np.sum(durations)/3600:.2f} hours ({np.sum(durations):.2f} seconds)")
     print(f"\n   Min duration:    {np.min(durations):.2f}s")
@@ -69,14 +69,14 @@ def analyze_durations(dataset_path):
     print(f"   Std deviation:   {np.std(durations):.2f}s")
     
     # Percentiles
-    print(f"\n📈 PERCENTILES:")
+    print(f"\nPERCENTILES:")
     percentiles = [10, 25, 50, 75, 90, 95, 99]
     for p in percentiles:
         val = np.percentile(durations, p)
         print(f"   {p:2d}th percentile: {val:.2f}s")
     
     # Sample length analysis
-    print(f"\n🎯 SAMPLE LENGTH ANALYSIS:")
+    print(f"\nSAMPLE LENGTH ANALYSIS:")
     print(f"   (Percentage of files >= sample length)\n")
     
     sample_lengths = [1, 2, 3, 4, 5, 7, 10, 15, 20, 30]
@@ -84,11 +84,11 @@ def analyze_durations(dataset_path):
     for length in sample_lengths:
         count = np.sum(durations >= length)
         percentage = (count / len(durations)) * 100
-        bar = '█' * int(percentage / 2)
+        bar = '#' * int(percentage / 2)
         print(f"   {length:2d}s: {count:5,} files ({percentage:5.1f}%) {bar}")
     
     # Recommend optimal sample length
-    print(f"\n💡 RECOMMENDATIONS:\n")
+    print(f"\nRECOMMENDATIONS:\n")
     
     # Find sample length that keeps 90% of data
     for length in [1, 2, 3, 4, 5, 7, 10, 15]:
@@ -96,12 +96,12 @@ def analyze_durations(dataset_path):
         if coverage >= 90:
             optimal = length
     
-    print(f"   ✅ Recommended sample length: {optimal}s")
+    print(f"   Recommended sample length: {optimal}s")
     print(f"      Keeps ~90%+ of dataset")
     print(f"      Ensures good data utilization")
     
     # Calculate chunks for different sample lengths
-    print(f"\n📦 ESTIMATED TRAINING CHUNKS:\n")
+    print(f"\nESTIMATED TRAINING CHUNKS:\n")
     print(f"   Sample   Total      Avg chunks")
     print(f"   Length   Chunks     per file")
     print(f"   " + "-"*35)
@@ -120,7 +120,7 @@ def analyze_durations(dataset_path):
         print(f"   {length:2d}s     {total_chunks:6,}     {avg_chunks:.2f}")
     
     # Distribution histogram
-    print(f"\n📊 Creating duration histogram...")
+    print(f"\nCreating duration histogram...")
     
     plt.figure(figsize=(12, 6))
     
@@ -154,12 +154,12 @@ def analyze_durations(dataset_path):
     
     plt.tight_layout()
     plt.savefig('vivos_duration_analysis.png', dpi=150, bbox_inches='tight')
-    print(f"   ✅ Saved plot: vivos_duration_analysis.png")
+    print(f"   Saved plot: vivos_duration_analysis.png")
     
     plt.show()
     
     print(f"\n{'='*70}")
-    print(f"✅ Analysis complete!")
+    print(f"Analysis complete!")
     print(f"{'='*70}\n")
 
 
@@ -173,7 +173,7 @@ def main():
     
     analyze_durations(train_noisy_path)
     
-    print("\n💡 USAGE TIP:")
+    print("\nUSAGE TIP:")
     print("   Based on the analysis above, update your notebook:")
     print("   ")
     print("   # Section 3: Configuration")

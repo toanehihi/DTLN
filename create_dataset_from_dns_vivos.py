@@ -1,18 +1,3 @@
-#!/usr/bin/env python3
-"""
-Script to create DTLN training dataset by mixing:
-- Clean speech from VIVOS dataset
-- Noise from DNS Challenge dataset
-
-Output:
-- datasets/train/noisy/*.wav
-- datasets/train/clean/*.wav
-- datasets/val/noisy/*.wav
-- datasets/val/clean/*.wav
-- datasets/test/noisy/*.wav
-- datasets/test/clean/*.wav
-"""
-
 import os
 import numpy as np
 import soundfile as sf
@@ -259,7 +244,7 @@ def create_dataset(vivos_path, dns_noise_path, output_base_path,
     print("="*70)
     
     # Collect VIVOS files
-    print(f"\n📂 Collecting VIVOS files from: {vivos_path}")
+    print(f"\nCollecting VIVOS files from: {vivos_path}")
     vivos_train_files = collect_vivos_files(vivos_path, 'train')
     vivos_test_files = collect_vivos_files(vivos_path, 'test')
     all_vivos_files = vivos_train_files + vivos_test_files
@@ -269,16 +254,16 @@ def create_dataset(vivos_path, dns_noise_path, output_base_path,
     print(f"   Total: {len(all_vivos_files):,} clean speech files")
     
     if len(all_vivos_files) == 0:
-        print("❌ No VIVOS files found! Please check the path.")
+        print("No VIVOS files found! Please check the path.")
         return
     
     # Collect DNS noise files
-    print(f"\n📂 Collecting DNS noise files from: {dns_noise_path}")
+    print(f"\nCollecting DNS noise files from: {dns_noise_path}")
     noise_files = collect_dns_noise_files(dns_noise_path)
     print(f"   Found {len(noise_files):,} noise files")
     
     if len(noise_files) == 0:
-        print("❌ No DNS noise files found! Please check the path.")
+        print("No DNS noise files found! Please check the path.")
         return
     
     # Split dataset
@@ -292,12 +277,12 @@ def create_dataset(vivos_path, dns_noise_path, output_base_path,
     val_files = all_vivos_files[train_end:val_end]
     test_files = all_vivos_files[val_end:]
     
-    print(f"\n📊 Dataset split:")
+    print(f"\nDataset split:")
     print(f"   Training:   {len(train_files):,} files ({len(train_files)/total_files*100:.1f}%)")
     print(f"   Validation: {len(val_files):,} files ({len(val_files)/total_files*100:.1f}%)")
     print(f"   Test:       {len(test_files):,} files ({len(test_files)/total_files*100:.1f}%)")
     
-    print(f"\n⚙️  Configuration:")
+    print(f"\nConfiguration:")
     print(f"   Sample rate: {target_sr} Hz")
     print(f"   SNR range:   {snr_range[0]} to {snr_range[1]} dB")
     print(f"   Workers:     {num_workers}")
@@ -339,26 +324,26 @@ def create_dataset(vivos_path, dns_noise_path, output_base_path,
             ))
         
         success_count = sum(results)
-        print(f"   ✅ Successfully created {success_count:,}/{len(files):,} file pairs")
+        print(f"   Successfully created {success_count:,}/{len(files):,} file pairs")
         
         if success_count < len(files):
-            print(f"   ⚠️  {len(files) - success_count} files failed")
+            print(f"   {len(files) - success_count} files failed")
     
     print(f"\n{'='*70}")
-    print("✅ Dataset creation complete!")
+    print("Dataset creation complete!")
     print(f"{'='*70}")
-    print(f"\n📁 Output directory: {output_base_path}")
+    print(f"\nOutput directory: {output_base_path}")
     print(f"   Structure:")
     print(f"   {output_base_path}/")
-    print(f"   ├── train/")
-    print(f"   │   ├── noisy/  ({len(train_files):,} files)")
-    print(f"   │   └── clean/  ({len(train_files):,} files)")
-    print(f"   ├── val/")
-    print(f"   │   ├── noisy/  ({len(val_files):,} files)")
-    print(f"   │   └── clean/  ({len(val_files):,} files)")
-    print(f"   └── test/")
-    print(f"       ├── noisy/  ({len(test_files):,} files)")
-    print(f"       └── clean/  ({len(test_files):,} files)")
+    print(f"   |-- train/")
+    print(f"   |   |-- noisy/  ({len(train_files):,} files)")
+    print(f"   |   +-- clean/  ({len(train_files):,} files)")
+    print(f"   |-- val/")
+    print(f"   |   |-- noisy/  ({len(val_files):,} files)")
+    print(f"   |   +-- clean/  ({len(val_files):,} files)")
+    print(f"   +-- test/")
+    print(f"       |-- noisy/  ({len(test_files):,} files)")
+    print(f"       +-- clean/  ({len(test_files):,} files)")
     print()
 
 
@@ -454,7 +439,7 @@ def main():
     # Validate ratios
     total_ratio = args.train_ratio + args.val_ratio + args.test_ratio
     if abs(total_ratio - 1.0) > 0.01:
-        print(f"⚠️  Warning: Train + Val + Test ratios = {total_ratio:.2f} (should be 1.0)")
+        print(f"Warning: Train + Val + Test ratios = {total_ratio:.2f} (should be 1.0)")
         print(f"    Normalizing ratios...")
         args.train_ratio /= total_ratio
         args.val_ratio /= total_ratio

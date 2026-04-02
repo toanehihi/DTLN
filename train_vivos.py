@@ -1,23 +1,3 @@
-#!/usr/bin/env python3
-"""
-Training script for DTLN model using VIVOS + DNS noise dataset.
-
-This script trains the DTLN (Dual-signal Transformation LSTM Network) model
-for speech enhancement using the VIVOS dataset mixed with DNS noise.
-
-Dataset structure expected:
-    datasets/
-    ├── train/
-    │   ├── noisy/  (VIVOS + DNS noise mixed)
-    │   └── clean/  (VIVOS clean speech)
-    ├── val/
-    │   ├── noisy/
-    │   └── clean/
-    └── test/
-        ├── noisy/
-        └── clean/
-"""
-
 import os
 import argparse
 import shutil
@@ -51,7 +31,7 @@ class EpochCheckpointCallback(Callback):
             f"{self.run_name}_epoch_{epoch+1:03d}.h5"
         )
         
-        print(f"\n💾 Saving checkpoint: {os.path.basename(epoch_checkpoint_path)}")
+        print(f"\nSaving checkpoint: {os.path.basename(epoch_checkpoint_path)}")
         self.model.save_weights(epoch_checkpoint_path)
         
         # Save as latest
@@ -67,12 +47,12 @@ class EpochCheckpointCallback(Callback):
             self.best_val_loss = val_loss
             best_checkpoint_path = os.path.join(
                 self.checkpoint_dir,
-                f"{self.run_name}_best.h5"
+                f"{self.run_name}_best.h5" 
             )
             shutil.copy(epoch_checkpoint_path, best_checkpoint_path)
-            print(f"⭐ New best model saved! Val Loss: {val_loss:.4f}")
+            print(f"New best model saved! Val Loss: {val_loss:.4f}")
         
-        print(f"✅ Checkpoint saved successfully!")
+        print(f"Checkpoint saved successfully!")
 
 
 def check_dataset_exists(dataset_path):
@@ -100,12 +80,12 @@ def check_dataset_exists(dataset_path):
     for dir_path in required_dirs:
         full_path = os.path.join(dataset_path, dir_path)
         if not os.path.exists(full_path):
-            print(f"❌ Missing: {full_path}")
+            print(f"Missing: {full_path}")
             all_exist = False
         else:
             # Count .wav files
             wav_files = [f for f in os.listdir(full_path) if f.endswith('.wav')]
-            print(f"✅ {dir_path:20s} - {len(wav_files):,} files")
+            print(f"{dir_path:20s} - {len(wav_files):,} files")
     
     print("=" * 70)
     return all_exist
@@ -121,7 +101,7 @@ def evaluate_model(modelTrainer, dataset_path, run_name):
         run_name: Name of the training run
     """
     print("\n" + "=" * 70)
-    print("📊 EVALUATING MODEL ON TEST SET")
+    print("EVALUATING MODEL ON TEST SET")
     print("=" * 70)
     
     test_noisy = os.path.join(dataset_path, 'test', 'noisy')
@@ -129,7 +109,7 @@ def evaluate_model(modelTrainer, dataset_path, run_name):
     
     # Check if test set exists
     if not os.path.exists(test_noisy) or not os.path.exists(test_clean):
-        print("⚠️  Test dataset not found. Skipping evaluation.")
+        print("Test dataset not found. Skipping evaluation.")
         return
     
     # Count test files
@@ -139,10 +119,10 @@ def evaluate_model(modelTrainer, dataset_path, run_name):
     # Load best model
     best_model_path = f"models_{run_name}/{run_name}_best.h5"
     if os.path.exists(best_model_path):
-        print(f"\n📥 Loading best model: {best_model_path}")
+        print(f"\nLoading best model: {best_model_path}")
         modelTrainer.model.load_weights(best_model_path)
     else:
-        print(f"\n⚠️  Best model not found at {best_model_path}")
+        print(f"\nBest model not found at {best_model_path}")
         print("Using current model weights for evaluation")
     
     # Evaluate on test set (using model.evaluate if available)
@@ -170,7 +150,6 @@ def evaluate_model(modelTrainer, dataset_path, run_name):
         print(f"Test steps: {steps_test:,}")
         print("\nRunning evaluation...")
         
-        # Evaluate
         results = modelTrainer.model.evaluate(
             dataset_test,
             steps=steps_test,
@@ -178,14 +157,14 @@ def evaluate_model(modelTrainer, dataset_path, run_name):
         )
         
         print("\n" + "=" * 70)
-        print("📊 EVALUATION RESULTS")
+        print("EVALUATION RESULTS")
         print("=" * 70)
         print(f"Test Loss (negative SNR): {results:.4f}")
         print(f"Estimated SNR improvement: {-results:.2f} dB")
         print("=" * 70)
         
     except Exception as e:
-        print(f"\n⚠️  Evaluation failed: {e}")
+        print(f"\nEvaluation failed: {e}")
         print("You can manually test the model using test_dtln_inference.py")
 
 
@@ -270,12 +249,11 @@ def main():
     
     # Verify dataset exists
     if not check_dataset_exists(dataset_path):
-        print("\n❌ Dataset validation failed!")
+        print("\nDataset validation failed!")
         print("Please ensure the dataset is prepared correctly.")
         print(f"Expected location: {os.path.abspath(dataset_path)}")
         return 1
     
-    # Print configuration
     print("\n" + "=" * 70)
     print("TRAINING CONFIGURATION")
     print("=" * 70)
@@ -288,8 +266,7 @@ def main():
     print(f"GPU device:        {args.gpu}")
     print("=" * 70)
     
-    # Create DTLN model instance
-    print("\n🏗️  Creating DTLN model...")
+    print("\nCreating DTLN model...")
     modelTrainer = DTLN_model()
     
     # Set hyperparameters
@@ -298,23 +275,21 @@ def main():
     modelTrainer.lr = args.learning_rate
     modelTrainer.len_samples = args.sample_length
     
-    # Build the model
-    print("🏗️  Building DTLN architecture...")
+    print("Building DTLN architecture...")
     modelTrainer.build_DTLN_model(norm_stft=args.norm_stft)
-    print("✅ Model built successfully!\n")
+    print("Model built successfully!\n")
     
-    # Compile the model
-    print("⚙️  Compiling model...")
+    print("Compiling model...")
     modelTrainer.compile_model()
-    print("✅ Model compiled!\n")
+    print("Model compiled!\n")
     
     # Train the model with custom checkpoint callback
     print("=" * 70)
-    print("🚀 STARTING TRAINING")
+    print("STARTING TRAINING")
     print("=" * 70)
-    print(f"📁 Training data:   {path_to_train_mix}")
-    print(f"📁 Validation data: {path_to_val_mix}")
-    print(f"💾 Models will be saved to: models_{args.run_name}/")
+    print(f"Training data:   {path_to_train_mix}")
+    print(f"Validation data: {path_to_val_mix}")
+    print(f"Models will be saved to: models_{args.run_name}/")
     print("=" * 70)
     print()
     
@@ -324,7 +299,6 @@ def main():
         from tensorflow.keras.callbacks import ReduceLROnPlateau, CSVLogger, EarlyStopping
         import numpy as np
         
-        # Create save directory
         savePath = f'./models_{args.run_name}/'
         os.makedirs(savePath, exist_ok=True)
         
@@ -332,8 +306,8 @@ def main():
         len_in_samples = int(np.fix(modelTrainer.fs * modelTrainer.len_samples / 
                                     modelTrainer.block_shift) * modelTrainer.block_shift)
         
-        print(f"🎵 Audio sample length: {len_in_samples} samples ({len_in_samples/modelTrainer.fs:.2f} seconds)")
-        print("\n📊 Creating data generators...")
+        print(f"Audio sample length: {len_in_samples} samples ({len_in_samples/modelTrainer.fs:.2f} seconds)")
+        print("\nCreating data generators...")
         
         # Create training data generator
         print("   Loading training data...")
@@ -349,8 +323,8 @@ def main():
         dataset = dataset.batch(modelTrainer.batchsize, drop_remainder=True).repeat()
         steps_train = generator_input.total_samples // modelTrainer.batchsize
         
-        print(f"   ✅ Training samples: {generator_input.total_samples:,}")
-        print(f"   ✅ Training steps per epoch: {steps_train:,}")
+        print(f"   Training samples: {generator_input.total_samples:,}")
+        print(f"   Training steps per epoch: {steps_train:,}")
         
         # Create validation data generator
         print("\n   Loading validation data...")
@@ -365,17 +339,16 @@ def main():
         dataset_val = dataset_val.batch(modelTrainer.batchsize, drop_remainder=True).repeat()
         steps_val = generator_val.total_samples // modelTrainer.batchsize
         
-        print(f"   ✅ Validation samples: {generator_val.total_samples:,}")
-        print(f"   ✅ Validation steps: {steps_val:,}")
-        print("\n✅ Data generators ready!")
+        print(f"   Validation samples: {generator_val.total_samples:,}")
+        print(f"   Validation steps: {steps_val:,}")
+        print("\nData generators ready!")
         
         # Setup callbacks
-        print("\n⚙️  Setting up training callbacks...")
+        print("\nSetting up training callbacks...")
         
         # Custom checkpoint callback (saves all epochs + best)
         checkpoint_callback = EpochCheckpointCallback(savePath, args.run_name)
         
-        # CSV logger
         csv_logger = CSVLogger(savePath + f'training_{args.run_name}.log', append=True)
         
         # Learning rate reduction
@@ -404,12 +377,11 @@ def main():
             early_stopping
         ]
         
-        print("✅ Callbacks configured!")
+        print("Callbacks configured!")
         print("\n" + "=" * 70)
-        print("🎯 Starting model.fit()...")
+        print("Starting model.fit()...")
         print("=" * 70)
         
-        # Train the model
         modelTrainer.model.fit(
             x=dataset,
             batch_size=None,
@@ -425,13 +397,13 @@ def main():
         )
         
         print("\n" + "=" * 70)
-        print("✅ TRAINING COMPLETED SUCCESSFULLY!")
+        print("TRAINING COMPLETED SUCCESSFULLY!")
         print("=" * 70)
-        print(f"\n💾 Saved checkpoints:")
+        print(f"\nSaved checkpoints:")
         print(f"   - All epochs: {savePath}{args.run_name}_epoch_XXX.h5")
         print(f"   - Latest: {savePath}{args.run_name}_latest.h5")
         print(f"   - Best: {savePath}{args.run_name}_best.h5")
-        print(f"📊 Training log: {savePath}training_{args.run_name}.log")
+        print(f"Training log: {savePath}training_{args.run_name}.log")
         
         # Evaluate on test set
         evaluate_model(modelTrainer, dataset_path, args.run_name)
@@ -440,13 +412,13 @@ def main():
         return 0
         
     except KeyboardInterrupt:
-        print("\n\n⚠️  Training interrupted by user!")
-        print(f"💾 Latest checkpoint saved to: models_{args.run_name}/")
+        print("\n\nTraining interrupted by user!")
+        print(f"Latest checkpoint saved to: models_{args.run_name}/")
         print("You can resume training by running this script again.")
         return 130
         
     except Exception as e:
-        print(f"\n\n❌ Training failed with error: {e}")
+        print(f"\n\nTraining failed with error: {e}")
         import traceback
         traceback.print_exc()
         return 1

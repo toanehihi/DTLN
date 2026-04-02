@@ -1,17 +1,3 @@
-#!/usr/bin/env python3
-"""
-Comprehensive Evaluation Script for DTLN Speech Enhancement Model
-
-This script evaluates the trained DTLN model on test dataset and generates:
-- Quantitative metrics: SNR, PESQ, STOI, SI-SDR
-- Visualizations: Spectrograms, waveforms, comparison plots
-- Statistical reports: Mean, std, per-sample results
-- Summary report for thesis/project documentation
-
-Author: DTLN Training Project
-Date: 2026-02-11
-"""
-
 import os
 import argparse
 import numpy as np
@@ -25,23 +11,21 @@ import pandas as pd
 import json
 from datetime import datetime
 
-# Import DTLN model
 from model import DTLN_model
 
-# Try to import evaluation metrics
 try:
     from pesq import pesq
     PESQ_AVAILABLE = True
 except ImportError:
     PESQ_AVAILABLE = False
-    print("⚠️  PESQ not available. Install with: pip install pesq")
+    print("PESQ not available. Install with: pip install pesq")
 
 try:
     from pystoi import stoi
     STOI_AVAILABLE = True
 except ImportError:
     STOI_AVAILABLE = False
-    print("⚠️  STOI not available. Install with: pip install pystoi")
+    print("STOI not available. Install with: pip install pystoi")
 
 
 def calculate_snr(clean, noisy):
@@ -400,7 +384,7 @@ def main():
         os.makedirs(os.path.join(args.output_dir, 'visualizations'), exist_ok=True)
     
     print("=" * 70)
-    print("📊 DTLN MODEL EVALUATION")
+    print("DTLN MODEL EVALUATION")
     print("=" * 70)
     print(f"Model weights: {args.model_weights}")
     print(f"Test directory: {args.test_dir}")
@@ -408,18 +392,18 @@ def main():
     print("=" * 70)
     
     # Load model
-    print("\n🏗️  Loading DTLN model...")
+    print("\nLoading DTLN model...")
     model_instance = DTLN_model()
     model_instance.build_DTLN_model()
     model_instance.model.load_weights(args.model_weights)
-    print("✅ Model loaded successfully!")
+    print("Model loaded successfully!")
     
     # Get test files
     noisy_dir = os.path.join(args.test_dir, 'noisy')
     clean_dir = os.path.join(args.test_dir, 'clean')
     
     if not os.path.exists(noisy_dir) or not os.path.exists(clean_dir):
-        print(f"\n❌ Test directories not found!")
+        print(f"\nTest directories not found!")
         print(f"Expected: {noisy_dir} and {clean_dir}")
         return 1
     
@@ -428,10 +412,10 @@ def main():
     if args.num_samples:
         noisy_files = noisy_files[:args.num_samples]
     
-    print(f"\n📁 Found {len(noisy_files)} test samples")
+    print(f"\nFound {len(noisy_files)} test samples")
     
     # Evaluate all samples
-    print("\n🎯 Evaluating samples...")
+    print("\nEvaluating samples...")
     all_results = []
     
     for idx, noisy_file in enumerate(tqdm(noisy_files, desc="Processing")):
@@ -439,11 +423,10 @@ def main():
         clean_path = os.path.join(clean_dir, noisy_file)
         
         if not os.path.exists(clean_path):
-            print(f"⚠️  Clean file not found: {clean_path}")
+            print(f"Clean file not found: {clean_path}")
             continue
         
         try:
-            # Evaluate
             results, clean, noisy, enhanced = evaluate_sample(
                 model_instance.model, noisy_path, clean_path
             )
@@ -470,7 +453,7 @@ def main():
                 plot_spectrogram_comparison(clean, noisy, enhanced, 16000, spectrogram_path)
         
         except Exception as e:
-            print(f"\n⚠️  Error processing {noisy_file}: {e}")
+            print(f"\nError processing {noisy_file}: {e}")
             continue
     
     # Create DataFrame
@@ -479,11 +462,11 @@ def main():
     # Save detailed results
     csv_path = os.path.join(args.output_dir, 'detailed_results.csv')
     results_df.to_csv(csv_path, index=False)
-    print(f"\n💾 Detailed results saved to: {csv_path}")
+    print(f"\nDetailed results saved to: {csv_path}")
     
     # Calculate statistics
     print("\n" + "=" * 70)
-    print("📊 EVALUATION RESULTS")
+    print("EVALUATION RESULTS")
     print("=" * 70)
     
     metrics_summary = {}
@@ -498,7 +481,7 @@ def main():
                 'min': float(results_df[column].min()),
                 'max': float(results_df[column].max())
             }
-            print(f"{column:25s}: {mean_val:8.4f} ± {std_val:6.4f}")
+            print(f"{column:25s}: {mean_val:8.4f} +/- {std_val:6.4f}")
     
     # Save summary
     summary_path = os.path.join(args.output_dir, 'summary.json')
@@ -510,18 +493,18 @@ def main():
             'metrics': metrics_summary
         }, f, indent=2)
     
-    print(f"\n💾 Summary saved to: {summary_path}")
+    print(f"\nSummary saved to: {summary_path}")
     
     # Generate metrics distribution plots
     if args.visualize:
-        print("\n📊 Generating metric distribution plots...")
+        print("\nGenerating metric distribution plots...")
         plot_metrics_distribution(results_df, args.output_dir)
-        print(f"✅ Saved to: {args.output_dir}/metrics_distribution.png")
+        print(f"Saved to: {args.output_dir}/metrics_distribution.png")
     
     print("\n" + "=" * 70)
-    print("✅ EVALUATION COMPLETED SUCCESSFULLY!")
+    print("EVALUATION COMPLETED SUCCESSFULLY!")
     print("=" * 70)
-    print(f"\n📁 Results saved to: {args.output_dir}/")
+    print(f"\nResults saved to: {args.output_dir}/")
     print(f"   - Detailed results: detailed_results.csv")
     print(f"   - Summary: summary.json")
     if args.save_audio:

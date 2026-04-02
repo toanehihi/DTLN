@@ -68,26 +68,26 @@ def check_vivos_dataset(base_path, dataset_type="train"):
     print(f"{'='*70}")
     
     if not os.path.exists(dataset_path):
-        print(f"❌ Path does not exist: {dataset_path}")
+        print(f"Path does not exist: {dataset_path}")
         return None
     
     # Load prompts/transcriptions
     prompts_file = os.path.join(dataset_path, 'prompts.txt')
     prompts = load_prompts(prompts_file)
-    print(f"📝 Loaded {len(prompts):,} transcriptions from prompts.txt")
+    print(f"Loaded {len(prompts):,} transcriptions from prompts.txt")
     
     # Find all speaker directories
     waves_path = os.path.join(dataset_path, 'waves')
     if not os.path.exists(waves_path):
-        print(f"❌ Waves directory not found: {waves_path}")
+        print(f"Waves directory not found: {waves_path}")
         return None
     
     speakers = [d for d in os.listdir(waves_path) if os.path.isdir(os.path.join(waves_path, d))]
     speakers.sort()
     num_speakers = len(speakers)
     
-    print(f"🎤 Number of speakers: {num_speakers}")
-    print(f"🔍 Analyzing audio files...")
+    print(f"Number of speakers: {num_speakers}")
+    print(f"Analyzing audio files...")
     
     # Statistics
     total_files = 0
@@ -124,7 +124,6 @@ def check_vivos_dataset(base_path, dataset_type="train"):
             if file_id not in prompts:
                 missing_transcription.append(file_id)
             
-            # Get file size
             try:
                 file_size = os.path.getsize(file_path)
                 total_size += file_size
@@ -143,7 +142,7 @@ def check_vivos_dataset(base_path, dataset_type="train"):
                 speaker_files += 1
                 
             except Exception as e:
-                print(f"\n⚠️  Error reading {wav_file}: {e}")
+                print(f"\nError reading {wav_file}: {e}")
                 missing_audio.append(file_id)
                 continue
         
@@ -161,7 +160,7 @@ def check_vivos_dataset(base_path, dataset_type="train"):
     avg_duration = total_duration / total_files if total_files > 0 else 0
     
     # Display overall results
-    print(f"\n📊 OVERALL STATISTICS:")
+    print(f"\nOVERALL STATISTICS:")
     print(f"   Total files:       {total_files:,}")
     print(f"   Total size:        {format_size(total_size)} ({total_size:,} bytes)")
     print(f"   Total duration:    {format_duration(total_duration)} ({total_duration:.2f} seconds / {total_duration/3600:.2f} hours)")
@@ -171,7 +170,7 @@ def check_vivos_dataset(base_path, dataset_type="train"):
     print(f"   Channel(s):        {sorted(channels)}")
     
     # Speaker statistics
-    print(f"\n🎤 SPEAKER STATISTICS:")
+    print(f"\nSPEAKER STATISTICS:")
     print(f"   Number of speakers: {num_speakers}")
     if speaker_stats:
         avg_files_per_speaker = total_files / num_speakers
@@ -187,15 +186,15 @@ def check_vivos_dataset(base_path, dataset_type="train"):
             print(f"      {i}. {speaker}: {stats['files']} files, {format_duration(stats['duration'])}")
     
     # Transcription analysis
-    print(f"\n📝 TRANSCRIPTION ANALYSIS:")
+    print(f"\nTRANSCRIPTION ANALYSIS:")
     print(f"   Total transcriptions: {len(prompts):,}")
     print(f"   Files with audio:     {total_files:,}")
     print(f"   Match status:         ", end='')
     
     if len(prompts) == total_files:
-        print(f"✅ Perfect match!")
+        print(f"Perfect match!")
     else:
-        print(f"⚠️  Mismatch detected")
+        print(f"Mismatch detected")
         if len(missing_transcription) > 0:
             print(f"   Missing transcription for {len(missing_transcription)} files")
         if len(missing_audio) > 0:
@@ -237,16 +236,16 @@ def main():
     print("="*70)
     
     if not os.path.exists(vivos_path):
-        print(f"\n❌ VIVOS directory not found: {vivos_path}")
+        print(f"\nVIVOS directory not found: {vivos_path}")
         print("Please make sure the 'vivos' directory exists in the current path.")
         return
     
     # Check training set
-    print("\n" + "🎯 TRAINING SET".center(70))
+    print("\n" + "TRAINING SET".center(70))
     train_stats = check_vivos_dataset(vivos_path, "train")
     
     # Check test set
-    print("\n" + "🎯 TEST SET".center(70))
+    print("\n" + "TEST SET".center(70))
     test_stats = check_vivos_dataset(vivos_path, "test")
     
     # Overall summary
@@ -266,7 +265,7 @@ def main():
             total_size += stats['total_size']
             total_duration += stats['total_duration']
     
-    print(f"\n📦 Complete VIVOS dataset:")
+    print(f"\nComplete VIVOS dataset:")
     print(f"   Total speakers:    {total_speakers:,}")
     print(f"   Total files:       {total_files:,}")
     print(f"   Total size:        {format_size(total_size)} ({total_size:,} bytes)")
@@ -277,23 +276,23 @@ def main():
         train_ratio = train_stats['total_duration'] / total_duration * 100
         test_ratio = test_stats['total_duration'] / total_duration * 100
         
-        print(f"\n📊 Dataset split:")
+        print(f"\nDataset split:")
         print(f"   Training:   {train_stats['total_duration']/3600:.2f} hours ({train_ratio:.1f}%)")
         print(f"   Test:       {test_stats['total_duration']/3600:.2f} hours ({test_ratio:.1f}%)")
     
     # Recommendations
-    print(f"\n💡 USAGE RECOMMENDATIONS:")
-    print(f"   • This is a clean speech corpus for ASR training")
-    print(f"   • For DTLN training, you'll need to add noise to create noisy/clean pairs")
-    print(f"   • Suggested approach:")
+    print(f"\nUSAGE RECOMMENDATIONS:")
+    print(f"   - This is a clean speech corpus for ASR training")
+    print(f"   - For DTLN training, you'll need to add noise to create noisy/clean pairs")
+    print(f"   - Suggested approach:")
     print(f"      1. Use VIVOS as clean speech")
     print(f"      2. Mix with noise datasets (DNS Challenge, FreeSound, etc.)")
     print(f"      3. Create synthetic noisy audio for speech enhancement")
-    print(f"   • Average utterance: {total_duration/total_files if total_files > 0 else 0:.1f}s")
+    print(f"   - Average utterance: {total_duration/total_files if total_files > 0 else 0:.1f}s")
     print(f"     (Good length for model training)")
     
     print("\n" + "="*70)
-    print("✅ VIVOS dataset check complete!")
+    print("VIVOS dataset check complete!")
     print("="*70 + "\n")
 
 
