@@ -1,301 +1,163 @@
-# Kiến Trúc Mô Hình DTLN
+# DTLN — Dual-signal Transformation LSTM Network
 
-**Dual-signal Transformation LSTM Network** - Mạng LSTM biến đổi tín hiệu kép cho khử nhiễu và tăng cường giọng nói thời gian thực.
-
----
-
-## Tổng Quan
-
-DTLN (Dual-signal Transformation LSTM Network) là mạng neural nhẹ được thiết kế cho tăng cường giọng nói thời gian thực. Nó sử dụng hai lõi tách tín hiệu với các phép biến đổi khác nhau:
-
-1. **Lõi thứ nhất**: Dựa trên STFT (Short-Time Fourier Transform)
-2. **Lõi thứ hai**: Biến đổi học được sử dụng 1D Convolution
-
-```mermaid
-flowchart LR
-    A[Âm thanh nhiễu] --> B[Lớp STFT]
-    B --> C[Lõi tách 1\nLSTM + Mask]
-    C --> D[Lớp iFFT]
-    D --> E[Conv1D Encoder]
-    E --> F[Lõi tách 2\nLSTM + Mask]
-    F --> G[Conv1D Decoder]
-    G --> H[Overlap-Add]
-    H --> I[Âm thanh sạch]
-```
+A lightweight neural network for real-time speech enhancement and noise suppression.
 
 ---
 
-## Tham Số Mô Hình
+## Model Architecture
 
-| Tham số | Mặc định | Mô tả |
-|---------|----------|-------|
-| `fs` | 16000 | Tần số lấy mẫu (Hz) |
-| `blockLen` | 512 | Độ dài khung cho STFT |
-| `block_shift` | 128 | Bước nhảy khung (hop size) |
-| `numUnits` | 128 | Số đơn vị ẩn LSTM |
-| `numLayer` | 2 | Số lớp LSTM |
-| `encoder_size` | 256 | Kích thước đầu ra Conv1D encoder |
-| `dropout` | 0.25 | Tỷ lệ dropout |
-| `activation` | sigmoid | Hàm kích hoạt cho mask |
+### Overview
+
+DTLN operates as a two-stage pipeline. Each stage applies a **learned multiplicative mask** to suppress noise while preserving speech content. The key design principle is that the model learns signal representations **directly from raw audio** — no handcrafted feature extraction (e.g., MFCC, mel-filterbanks) is required.
+
+| Stage | Domain | Transform | Purpose |
+|-------|--------|-----------|---------|
+| 1 | Frequency | STFT | Coarse noise suppression on spectral magnitudes |
+| 2 | Learned | 1D Convolution | Fine-grained enhancement on learned representations |
+
+By combining a classical signal-processing transform (STFT) with a data-driven transform (Conv1D), the model achieves robust denoising with only ~2 M parameters — small enough for real-time inference on mobile and edge devices.
+
+### Signal Flow
+
+```
+Raw waveform
+  │
+  ├──► STFT ──► magnitude + phase
+  │                │
+  │           [LayerNorm]  (optional, norm variant)
+  │                │
+  │           LSTM × 2 ──► Dense ──► Sigmoid ──► mask₁
+  │                │
+  │           magnitude × mask₁
+  │                │
+  │           iFFT (reconstruct time-domain frames)
+  │                │
+  │           Conv1D Encoder  (512 → 256, kernel=1)
+  │                │
+  │           Instant Layer Normalization
+  │                │
+  │           LSTM × 2 ──► Dense ──► Sigmoid ──► mask₂
+  │                │
+  │           encoded × mask₂
+  │                │
+  │           Conv1D Decoder  (256 → 512, kernel=1, causal)
+  │                │
+  └──► Overlap-and-Add ──► Enhanced waveform
+```
+
+### Stage 1 — STFT Domain
+
+The input waveform is segmented into overlapping frames (512 samples, hop 128) and transformed via real-valued FFT. The resulting magnitude spectrum is passed through two stacked LSTM layers that predict a sigmoid-bounded mask in the range [0, 1]. Multiplying the original magnitude by this mask attenuates noise-dominated frequency bins while retaining speech harmonics. The masked magnitude and the original phase are then recombined through an inverse FFT to produce time-domain frames.
+
+### Stage 2 — Learned Domain via 1D Convolution
+
+Rather than applying a second mask in the same spectral domain, the model transforms the output of Stage 1 into a **learned feature space** using a pointwise 1D convolutional layer (kernel size = 1). This Conv1D encoder acts as a linear projection from 512-dimensional frame samples to a 256-dimensional latent representation — effectively learning a task-specific transform that captures patterns not easily expressed by the fixed Fourier basis.
+
+After normalization, a second pair of LSTM layers predicts another multiplicative mask over these learned features. A causal Conv1D decoder then projects the masked representation back to the original frame dimension, and overlap-and-add reconstructs the final enhanced waveform.
+
+### Why 1D Convolution Is Effective
+
+Traditional audio processing pipelines rely on hand-designed features (e.g., mel-scale filterbanks, spectral flux). While effective in well-understood scenarios, these fixed representations cannot adapt to the specific noise characteristics present in the training data.
+
+The 1D convolutional layers in DTLN replace this manual step:
+
+- **Data-driven basis functions.** Each filter in the Conv1D layer learns a projection that is optimal for the denoising objective, not constrained to sinusoidal bases or perceptual scales.
+- **Complementary to STFT.** Stage 1 already handles frequency-domain masking. The learned transform in Stage 2 captures residual distortions and temporal patterns that the Fourier representation misses.
+- **Computational efficiency.** Pointwise convolutions (kernel = 1) add negligible computation while providing a fully learnable, end-to-end differentiable transform.
+
+This dual-transform design — one fixed (STFT), one learned (Conv1D) — is what gives DTLN its robustness across diverse noise conditions without requiring domain-specific feature engineering.
 
 ---
 
-## Chi Tiết Kiến Trúc
+## Model Parameters
 
-### 1. Lớp STFT
-
-Chuyển đổi tín hiệu miền thời gian sang miền tần số:
-
-```python
-# Chia khung tín hiệu
-frames = tf.signal.frame(x, blockLen=512, block_shift=128)
-
-# Tính FFT
-stft = tf.signal.rfft(frames)  # Trả về NFFT/2 + 1 = 257 bins
-
-# Tách biên độ và pha
-mag = tf.abs(stft)      # Biên độ
-phase = tf.math.angle(stft)  # Pha
-```
-
-### 2. Lõi Tách Tín Hiệu (Dựa trên LSTM)
-
-Cả hai lõi đều có kiến trúc giống nhau:
-
-```mermaid
-flowchart TB
-    A[Đặc trưng đầu vào] --> B[LSTM Layer 1]
-    B --> C[Dropout 0.25]
-    C --> D[LSTM Layer 2]
-    D --> E[Dense Layer]
-    E --> F[Sigmoid Activation]
-    F --> G[Mask đầu ra]
-```
-
-**Điểm chính:**
-- 2 lớp LSTM xếp chồng với 128 đơn vị ẩn mỗi lớp
-- Dropout giữa các lớp (không có sau LSTM cuối)
-- Lớp Dense ánh xạ tới kích thước mask
-- Sigmoid giới hạn mask trong khoảng [0, 1]
-
-### 3. Xử Lý Lõi Thứ Nhất
-
-```
-Đầu vào: Biên độ STFT [batch, frames, 257]
-     ↓
-(Tùy chọn) Layer Normalization trên log-magnitude
-     ↓
-Separation Kernel → Mask [batch, frames, 257]
-     ↓
-Nhân: estimated_mag = mag × mask_1
-     ↓
-iFFT: Chuyển về miền thời gian
-```
-
-### 4. Xử Lý Lõi Thứ Hai
-
-```
-Đầu vào: Khung miền thời gian [batch, frames, 512]
-     ↓
-Conv1D Encoder (512 → 256) -- Biến đổi học được
-     ↓
-Instant Layer Normalization
-     ↓
-Separation Kernel → Mask [batch, frames, 256]
-     ↓
-Nhân: estimated = encoded × mask_2
-     ↓
-Conv1D Decoder (256 → 512)
-     ↓
-Overlap-and-Add → Dạng sóng tái tạo
-```
-
-### 5. Pipeline Hoàn Chỉnh
-
-```mermaid
-flowchart TB
-    subgraph Input["Đầu vào"]
-        A[Tín hiệu miền thời gian\nbatch × samples]
-    end
-    
-    subgraph Core1["Lõi tách 1 (Miền STFT)"]
-        B[STFT\nmag + phase]
-        C[Tùy chọn: LayerNorm]
-        D[2× LSTM + Dense]
-        E[Sigmoid Mask]
-        F[Nhân mag × mask]
-        G[iFFT]
-    end
-    
-    subgraph Core2["Lõi tách 2 (Miền học được)"]
-        H[Conv1D Encoder]
-        I[InstantLayerNorm]
-        J[2× LSTM + Dense]
-        K[Sigmoid Mask]
-        L[Nhân encoded × mask]
-        M[Conv1D Decoder]
-    end
-    
-    subgraph Output["Đầu ra"]
-        N[Overlap-Add]
-        O[Tín hiệu sạch\nbatch × samples]
-    end
-    
-    A --> B --> C --> D --> E --> F --> G
-    G --> H --> I --> J --> K --> L --> M --> N --> O
-```
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| Sample rate | 16 000 Hz | Input audio sample rate |
+| Block length | 512 | Frame size for STFT |
+| Block shift | 128 | Hop size (75% overlap) |
+| LSTM units | 128 | Hidden units per LSTM layer |
+| LSTM layers | 2 | Stacked layers per separation kernel |
+| Encoder size | 256 | Conv1D output channels |
+| Dropout | 0.25 | Applied between LSTM layers |
+| Mask activation | Sigmoid | Bounds mask to [0, 1] |
 
 ---
 
 ## Instant Layer Normalization
 
-Lớp chuẩn hóa tùy chỉnh cho chuẩn hóa theo kênh:
+A per-frame normalization layer that computes mean and variance over the feature axis:
+
+```
+output = gamma * (x - mean) / sqrt(variance + epsilon) + beta
+```
+
+- **gamma** — learnable scale (initialized to 1)
+- **beta** — learnable shift (initialized to 0)
+- **epsilon** — numerical stability constant (1e-7)
+
+This is applied before each separation kernel to stabilize LSTM input distributions.
+
+---
+
+## Loss Function
+
+The model is trained with a **negative SNR loss**:
+
+```
+SNR = mean(s_true^2) / mean((s_true - s_estimate)^2 + 1e-7)
+loss = -10 * log10(SNR)
+```
+
+Minimizing this loss directly maximizes the signal-to-noise ratio between the estimated and reference clean speech.
+
+---
+
+## Training Configuration
+
+| Setting | Value |
+|---------|-------|
+| Optimizer | Adam (gradient clipping, max norm = 3.0) |
+| Learning rate | 1e-3 (initial) |
+| Batch size | 32 |
+| Max epochs | 200 |
+| Segment length | 15 seconds |
+
+**Callbacks:**
+
+- **ReduceLROnPlateau** — halve LR if val_loss stalls for 3 epochs
+- **EarlyStopping** — stop after 10 epochs without improvement
+- **ModelCheckpoint** — save best weights only
+- **CSVLogger** — record training metrics per epoch
+
+---
+
+## Model Variants
+
+| Variant | Layers | Use case |
+|---------|--------|----------|
+| Standard | 9 | Batch inference, variable-length input |
+| Normalized (norm) | 10 | Adds LayerNorm on STFT magnitude before Stage 1 |
+| Stateful | 9 or 10 | Real-time frame-by-frame processing (batch = 1) |
+| TF-Lite | Split into 2 models | Mobile / edge deployment with optional quantization |
+
+---
+
+## Usage
 
 ```python
-# Chuẩn hóa từng khung
-mean = reduce_mean(inputs, axis=-1)
-variance = reduce_mean((inputs - mean)², axis=-1)
-std = sqrt(variance + ε)
+from test_package.test_dtln import DTLNModel
 
-# Chuẩn hóa và scale
-output = γ × (inputs - mean) / std + β
-```
+model = DTLNModel("model/DTLN_vivos_best.h5", norm_stft=False)
+model.build()
+model.load_weights()
 
-- **γ (gamma)**: Tham số scale học được (khởi tạo: 1)
-- **β (beta)**: Tham số bias học được (khởi tạo: 0)
-- **ε**: Hằng số nhỏ (1e-7) để ổn định số học
-
----
-
-## Hàm Mất Mát
-
-**Tỷ lệ tín hiệu trên nhiễu âm (SNR) âm**:
-
-```python
-def snr_cost(s_estimate, s_true):
-    snr = mean(s_true²) / mean((s_true - s_estimate)² + 1e-7)
-    loss = -10 × log₁₀(snr)
-    return loss
-```
-
-Điều này khuyến khích mô hình tối đa hóa SNR giữa giọng nói dự đoán và giọng nói sạch mục tiêu.
-
----
-
-## Quy Trình Huấn Luyện
-
-### Bộ Sinh Dữ Liệu
-
-```mermaid
-flowchart LR
-    A[File âm thanh nhiễu] --> C[Audio Generator]
-    B[File âm thanh sạch] --> C
-    C --> D[Chia thành\nđoạn 15 giây]
-    D --> E[tf.data.Dataset]
-    E --> F[Batch × 32]
-    F --> G[Huấn luyện mô hình]
-```
-
-**Quy trình:**
-1. Đọc các cặp file âm thanh nhiễu/sạch
-2. Kiểm tra đơn kênh và tần số lấy mẫu khớp
-3. Chia thành các đoạn có độ dài cố định (mặc định 15 giây)
-4. Tạo TensorFlow Dataset với batching
-
-### Cấu Hình Huấn Luyện
-
-| Thiết lập | Giá trị |
-|-----------|---------|
-| Optimizer | Adam với gradient clipping (norm=3.0) |
-| Learning Rate | 1e-3 (ban đầu) |
-| Batch Size | 32 |
-| Max Epochs | 200 |
-| Workers | 4 (multiprocessing) |
-
-### Callbacks
-
-1. **ReduceLROnPlateau**: Giảm một nửa LR nếu val_loss không cải thiện trong 3 epoch
-2. **EarlyStopping**: Dừng nếu không cải thiện trong 10 epoch
-3. **ModelCheckpoint**: Lưu trọng số mô hình tốt nhất
-4. **CSVLogger**: Ghi log các metrics huấn luyện
-
-### Luồng Huấn Luyện
-
-```mermaid
-flowchart TB
-    A[Xây dựng mô hình DTLN] --> B[Compile với Adam + SNR Loss]
-    B --> C[Tạo Train/Val Generators]
-    C --> D[Huấn luyện với Callbacks]
-    D --> E{Early Stopping?}
-    E -->|Không| D
-    E -->|Có| F[Lưu trọng số tốt nhất]
+denoised = model.denoise(noisy_audio, fs=16000)
 ```
 
 ---
 
-## Các Biến Thể Mô Hình
+## References
 
-### 1. Mô hình chuẩn (`build_DTLN_model`)
-- Cho huấn luyện và suy luận batch
-- Hỗ trợ đầu vào độ dài thay đổi
-- Sử dụng overlap-add cho tái tạo
-
-### 2. Mô hình stateful (`build_DTLN_model_stateful`)
-- Cho xử lý thời gian thực từng khung
-- Batch size cố định là 1
-- Kích thước đầu vào cố định `blockLen` mẫu
-- Trạng thái LSTM được duy trì giữa các khung
-
-### 3. Mô hình TF-Lite (`create_tf_lite_model`)
-- Chia thành hai mô hình riêng cho triển khai di động
-- Model 1: Lõi STFT (magnitude → mask)
-- Model 2: Lõi biến đổi học được
-- Tùy chọn dynamic range quantization
-
----
-
-## Quyết Định Thiết Kế Chính
-
-1. **Biến đổi kép**: Kết hợp biến đổi miền tần số (STFT) và biến đổi học được để tăng độ robust
-
-2. **Phương pháp masking**: Sử dụng mask nhân (sigmoid bounded) thay vì dự đoán trực tiếp
-
-3. **Nhẹ**: Chỉ ~2M tham số, phù hợp cho thời gian thực trên thiết bị di động/edge
-
-4. **Xử lý nhân quả**: Thiết kế hỗ trợ streaming độ trễ thấp với stateful LSTM
-
-5. **Tái tạo được**: Seed được đặt cho Python, NumPy, và TensorFlow (seed=42)
-
----
-
-## Ví Dụ Sử Dụng
-
-```python
-# Khởi tạo mô hình
-model = DTLN_model()
-
-# Xây dựng kiến trúc
-model.build_DTLN_model(norm_stft=False)
-
-# Compile cho huấn luyện
-model.compile_model()
-
-# Huấn luyện
-model.train_model(
-    runName='my_experiment',
-    path_to_train_mix='/path/to/noisy/train',
-    path_to_train_speech='/path/to/clean/train',
-    path_to_val_mix='/path/to/noisy/val',
-    path_to_val_speech='/path/to/clean/val'
-)
-
-# Xuất sang TF-Lite
-model.create_tf_lite_model('weights.h5', 'dtln_model')
-```
-
----
-
-## Tài Liệu Tham Khảo
-
-- Bài báo gốc: [DTLN - A Dual-Signal Transformation LSTM Network for Real-Time Noise Suppression](https://arxiv.org/abs/2005.07551)
-- Instant Layer Normalization: [Luo & Mesgarani](https://arxiv.org/abs/1809.07454v2)
+- Westhausen & Meyer, *"Dual-Signal Transformation LSTM Network for Real-Time Noise Suppression"*, INTERSPEECH 2020. [arXiv:2005.07551](https://arxiv.org/abs/2005.07551)
+- Luo & Mesgarani, *"Conv-TasNet: Surpassing Ideal Time-Frequency Magnitude Masking for Speech Separation"*, 2019. [arXiv:1809.07454](https://arxiv.org/abs/1809.07454v2)
